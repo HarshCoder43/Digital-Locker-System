@@ -11,17 +11,24 @@ dotenv.config();
 
 const app = express();
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
+// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/lockers", lockerRoutes);
 app.use("/api/rentals", rentalRoutes);
 
+// Health check
 app.get("/", (req, res) => {
-  res.send("Digital Locker Backend is Running!");
+  res.json({
+    message: "Digital Locker Backend is Running!",
+    status: "OK",
+  });
 });
 
+// MongoDB connection
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
@@ -32,8 +39,14 @@ mongoose
     console.log(error.message);
   });
 
+// Local development
 const PORT = process.env.PORT || 5050;
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== "production") {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+// Export for Vercel
+module.exports = app;
