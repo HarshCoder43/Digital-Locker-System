@@ -8,75 +8,33 @@ import AdminPanel from "./AdminPanel";
 
 const API_URL = "https://digital-locker-system.vercel.app";
 
-/* =========================================
-   ANIMATED NUMBER
-========================================= */
-
-function AnimatedNumber({ value }) {
-  const [displayValue, setDisplayValue] = useState(0);
-
-  useEffect(() => {
-    const target = Number(value) || 0;
-    const duration = 700;
-    const startTime = performance.now();
-
-    const animate = (currentTime) => {
-      const progress = Math.min(
-        (currentTime - startTime) / duration,
-        1
-      );
-
-      const eased = 1 - Math.pow(1 - progress, 3);
-
-      setDisplayValue(Math.floor(target * eased));
-
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      }
-    };
-
-    requestAnimationFrame(animate);
-  }, [value]);
-
-  return <>{displayValue}</>;
-}
-
-/* =========================================
-   APP
-========================================= */
-
 function App() {
   const [user, setUser] = useState(null);
   const [lockers, setLockers] = useState([]);
+  const [selectedLocker, setSelectedLocker] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const [selectedLocker, setSelectedLocker] = useState(null);
-
-  const [activeSection, setActiveSection] =
-    useState("dashboard");
-
-  /* =========================================
-     RESTORE LOGIN SESSION
-  ========================================= */
+  // ===============================
+  // CHECK LOGIN SESSION
+  // ===============================
 
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
-    const token = localStorage.getItem("token");
 
-    if (savedUser && token) {
+    if (savedUser) {
       try {
         setUser(JSON.parse(savedUser));
       } catch (error) {
+        console.error("Invalid saved user:", error);
         localStorage.removeItem("user");
         localStorage.removeItem("token");
       }
     }
   }, []);
 
-  /* =========================================
-     FETCH LOCKERS
-     STUDENT ONLY
-  ========================================= */
+  // ===============================
+  // FETCH LOCKERS
+  // ===============================
 
   const fetchLockers = async () => {
     try {
@@ -84,35 +42,52 @@ function App() {
 
       const token = localStorage.getItem("token");
 
+      if (!token) {
+        console.error("No authentication token found.");
+        return;
+      }
+
       const response = await fetch(
-        `${API_URL}/api/lockers`,
+        `${API_URL}/api/lockers?t=${Date.now()}`,
         {
+          method: "GET",
+          cache: "no-store",
           headers: {
             Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache",
           },
         }
       );
 
       const data = await response.json();
 
-      if (response.ok) {
+      console.log("Locker API Status:", response.status);
+      console.log("Lockers received:", data);
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || `Failed to fetch lockers (${response.status})`
+        );
+      }
+
+      if (Array.isArray(data)) {
         setLockers(data);
       } else {
-        console.log(data);
+        console.error("Unexpected locker response:", data);
+        setLockers([]);
       }
     } catch (error) {
-      console.log(
-        "Failed to fetch lockers:",
-        error
-      );
+      console.error("Fetch lockers failed:", error);
+      setLockers([]);
     } finally {
       setLoading(false);
     }
   };
 
-  /* =========================================
-     FETCH LOCKERS AFTER LOGIN
-  ========================================= */
+  // ===============================
+  // FETCH LOCKERS AFTER STUDENT LOGIN
+  // ===============================
 
   useEffect(() => {
     if (user && user.role === "student") {
@@ -120,19 +95,17 @@ function App() {
     }
   }, [user]);
 
-  /* =========================================
-     LOGIN
-  ========================================= */
+  // ===============================
+  // LOGIN
+  // ===============================
 
   const handleLogin = (loggedInUser) => {
     setUser(loggedInUser);
-    setActiveSection("dashboard");
-    setSelectedLocker(null);
   };
 
-  /* =========================================
-     LOGOUT
-  ========================================= */
+  // ===============================
+  // LOGOUT
+  // ===============================
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -141,206 +114,60 @@ function App() {
     setUser(null);
     setLockers([]);
     setSelectedLocker(null);
-    setActiveSection("dashboard");
   };
 
-  /* =========================================
-     RENTAL SUCCESS
-     STUDENT ONLY
-  ========================================= */
+  // ===============================
+  // REFRESH LOCKERS
+  // ===============================
 
-  const handleRentalSuccess = () => {
-    if (!user || user.role !== "student") {
-      return;
-    }
-
-    setSelectedLocker(null);
-
+  const handleRefresh = () => {
     fetchLockers();
-
-    setActiveSection("rental");
   };
 
-  /* =========================================
-     NAVIGATION
-  ========================================= */
-
-  const scrollToSection = (section) => {
-    setActiveSection(section);
-
-    setTimeout(() => {
-      const element =
-        document.getElementById(section);
-
-      if (element) {
-        element.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      }
-    }, 50);
-  };
-
-  /* =========================================
-     LOGIN PAGE
-  ========================================= */
+  // ===============================
+  // LOGIN SCREEN
+  // ===============================
 
   if (!user) {
     return <Login onLogin={handleLogin} />;
   }
 
-  /* =========================================
-     ROLE
-  ========================================= */
-
   const isAdmin = user.role === "admin";
   const isStudent = user.role === "student";
 
-  /* =========================================
-     LOCKER COUNTS
-  ========================================= */
+  const availableLockers = lockers.filter(
+    (locker) => locker.status === "Available"
+  );
 
-  const availableCount = lockers.filter(
-    (locker) =>
-      locker.status === "Available"
-  ).length;
+  const occupiedLockers = lockers.filter(
+    (locker) => locker.status === "Occupied"
+  );
 
-  const occupiedCount = lockers.filter(
-    (locker) =>
-      locker.status === "Occupied"
-  ).length;
-
-  const maintenanceCount = lockers.filter(
-    (locker) =>
-      locker.status === "Maintenance"
-  ).length;
+  const maintenanceLockers = lockers.filter(
+    (locker) => locker.status === "Maintenance"
+  );
 
   return (
     <div className="app">
 
-      {/* =====================================
-          BACKGROUND EFFECTS
-      ===================================== */}
+      {/* ===============================
+          HEADER
+      =============================== */}
 
-      <div className="ambient ambient-one"></div>
-      <div className="ambient ambient-two"></div>
-      <div className="ambient ambient-three"></div>
-
-      <div className="floating-particle particle-one"></div>
-      <div className="floating-particle particle-two"></div>
-      <div className="floating-particle particle-three"></div>
-      <div className="floating-particle particle-four"></div>
-
-      {/* =====================================
-          NAVBAR
-      ===================================== */}
-
-      <nav className="navbar">
-
-        {/* BRAND */}
-
-        <div
-          className="brand"
-          onClick={() =>
-            scrollToSection("dashboard")
-          }
-        >
-          <div className="brand-icon">
-            🔐
-          </div>
+      <header className="topbar">
+        <div className="brand">
+          <div className="brand-logo">DL</div>
 
           <div>
-            <h2>
-              Digital Locker
-            </h2>
-
-            <span>
-              Booking System
-            </span>
+            <h1>Digital Locker</h1>
+            <span>University Storage Management</span>
           </div>
         </div>
 
-        {/* NAVIGATION */}
-
-        <div className="desktop-nav">
-
-          {/* DASHBOARD - BOTH */}
-
-          <button
-            className={
-              activeSection === "dashboard"
-                ? "nav-link active"
-                : "nav-link"
-            }
-            onClick={() =>
-              scrollToSection("dashboard")
-            }
-          >
-            Dashboard
-          </button>
-
-          {/* =================================
-              MY RENTAL - STUDENT ONLY
-          ================================= */}
-
-          {isStudent && (
-            <button
-              className={
-                activeSection === "rental"
-                  ? "nav-link active"
-                  : "nav-link"
-              }
-              onClick={() =>
-                scrollToSection("rental")
-              }
-            >
-              My Rental
-            </button>
-          )}
-
-          {/* =================================
-              ADMINISTRATION - ADMIN ONLY
-          ================================= */}
-
-          {isAdmin && (
-            <button
-              className={
-                activeSection === "admin"
-                  ? "nav-link active"
-                  : "nav-link"
-              }
-              onClick={() =>
-                scrollToSection("admin")
-              }
-            >
-              Administration
-            </button>
-          )}
-
-        </div>
-
-        {/* RIGHT SIDE */}
-
-        <div className="nav-right">
-
-          <div className="nav-user">
-
-            <span className="user-name">
-              {user.name}
-            </span>
-
-            <span className="user-role">
-              {user.role}
-            </span>
-
-          </div>
-
-          <div className="nav-status">
-
-            <span className="status-dot"></span>
-
-            System Online
-
+        <div className="user-section">
+          <div className="user-info">
+            <strong>{user.name}</strong>
+            <span>{user.role}</span>
           </div>
 
           <button
@@ -349,615 +176,202 @@ function App() {
           >
             Logout
           </button>
-
         </div>
+      </header>
 
-      </nav>
+      {/* ===============================
+          MAIN CONTENT
+      =============================== */}
 
-      {/* =====================================
-          MAIN
-      ===================================== */}
+      <main className="dashboard">
 
-      <main className="container">
+        {/* ===============================
+            WELCOME
+        =============================== */}
 
-        {/* ===================================
-            HERO
-        =================================== */}
-
-        <section
-          id="dashboard"
-          className="hero reveal"
-        >
-
-          <div className="hero-content">
-
-            <div className="hero-badge">
-
-              <span className="hero-badge-dot"></span>
-
-              UNIVERSITY LIBRARY
-
-            </div>
-
-            {/* ROLE BASED TITLE */}
-
-            <h1>
-
-              {isAdmin ? (
-                <>
-                  Manage Your
-                  <span>
-                    Locker System.
-                  </span>
-                </>
-              ) : (
-                <>
-                  Find Your
-                  <span>
-                    Perfect Locker.
-                  </span>
-                </>
-              )}
-
-            </h1>
-
-            {/* ROLE BASED DESCRIPTION */}
-
-            <p className="hero-text">
-
-              {isAdmin ? (
-                <>
-                  Welcome back, {user.name}.
-                  Manage your university
-                  locker system and control
-                  library storage operations.
-                </>
-              ) : (
-                <>
-                  Welcome back, {user.name}.
-                  Find an available locker
-                  and manage your storage
-                  rental securely.
-                </>
-              )}
-
+        <section className="welcome-section">
+          <div>
+            <p className="eyebrow">
+              {isAdmin ? "ADMINISTRATION" : "STUDENT PORTAL"}
             </p>
 
-            <div className="hero-actions">
+            <h2>
+              Welcome back, {user.name}
+            </h2>
 
-              {/* =================================
-                  STUDENT HERO ACTIONS
-              ================================= */}
-
-              {isStudent && (
-                <>
-                  <button
-                    className="hero-primary"
-                    onClick={() =>
-                      document
-                        .getElementById(
-                          "inventory"
-                        )
-                        ?.scrollIntoView({
-                          behavior: "smooth",
-                        })
-                    }
-                  >
-                    Explore Lockers
-
-                    <span>
-                      →
-                    </span>
-                  </button>
-
-                  <button
-                    className="hero-secondary"
-                    onClick={() =>
-                      scrollToSection("rental")
-                    }
-                  >
-                    View My Rental
-                  </button>
-                </>
-              )}
-
-              {/* =================================
-                  ADMIN HERO ACTIONS
-              ================================= */}
-
-              {isAdmin && (
-                <>
-                  <button
-                    className="hero-primary"
-                    onClick={() =>
-                      scrollToSection("admin")
-                    }
-                  >
-                    Manage Lockers
-
-                    <span>
-                      →
-                    </span>
-                  </button>
-
-                  <button
-                    className="hero-secondary"
-                    onClick={() =>
-                      scrollToSection("admin")
-                    }
-                  >
-                    Open Administration
-                  </button>
-                </>
-              )}
-
-            </div>
-
+            <p>
+              {isAdmin
+                ? "Manage lockers, rentals and maintenance from the administration panel."
+                : "Manage your university locker and rental details."}
+            </p>
           </div>
-
-          {/* HERO ORBIT */}
-
-          <div className="hero-orbit">
-
-            <div className="orbit orbit-one"></div>
-
-            <div className="orbit orbit-two"></div>
-
-            <div className="orbit-core">
-              {isAdmin ? "⚙️" : "🔐"}
-            </div>
-
-          </div>
-
         </section>
 
-        {/* ===================================
-            STUDENT ONLY
-            LOCKER STATISTICS
-        =================================== */}
+        {/* ===============================
+            STUDENT DASHBOARD
+        =============================== */}
 
         {isStudent && (
-          <section className="stats reveal">
+          <>
+            {/* Stats */}
 
-            {/* TOTAL */}
+            <section className="stats-grid">
 
-            <div className="stat-card">
-
-              <div className="stat-icon total">
-                🔒
+              <div className="stat-card">
+                <span>Total Lockers</span>
+                <strong>{lockers.length}</strong>
               </div>
 
-              <div>
-
-                <span>
-                  Total Lockers
-                </span>
-
-                <strong>
-                  <AnimatedNumber
-                    value={lockers.length}
-                  />
-                </strong>
-
+              <div className="stat-card">
+                <span>Available</span>
+                <strong>{availableLockers.length}</strong>
               </div>
 
-              <div className="stat-line"></div>
-
-            </div>
-
-            {/* AVAILABLE */}
-
-            <div className="stat-card">
-
-              <div className="stat-icon available">
-                ✓
+              <div className="stat-card">
+                <span>Occupied</span>
+                <strong>{occupiedLockers.length}</strong>
               </div>
 
-              <div>
-
-                <span>
-                  Available
-                </span>
-
-                <strong>
-                  <AnimatedNumber
-                    value={availableCount}
-                  />
-                </strong>
-
+              <div className="stat-card">
+                <span>Maintenance</span>
+                <strong>{maintenanceLockers.length}</strong>
               </div>
 
-              <div className="stat-line green"></div>
+            </section>
 
-            </div>
+            {/* ===============================
+                LOCKER AVAILABILITY
+            =============================== */}
 
-            {/* OCCUPIED */}
+            <section
+              id="inventory"
+              className="dashboard-card"
+            >
+              <div className="section-header">
 
-            <div className="stat-card">
-
-              <div className="stat-icon occupied">
-                ●
-              </div>
-
-              <div>
-
-                <span>
-                  Occupied
-                </span>
-
-                <strong>
-                  <AnimatedNumber
-                    value={occupiedCount}
-                  />
-                </strong>
-
-              </div>
-
-              <div className="stat-line red"></div>
-
-            </div>
-
-            {/* MAINTENANCE */}
-
-            <div className="stat-card">
-
-              <div className="stat-icon maintenance">
-                ⚙
-              </div>
-
-              <div>
-
-                <span>
-                  Maintenance
-                </span>
-
-                <strong>
-                  <AnimatedNumber
-                    value={maintenanceCount}
-                  />
-                </strong>
-
-              </div>
-
-              <div className="stat-line"></div>
-
-            </div>
-
-          </section>
-        )}
-
-        {/* ===================================
-            STUDENT ONLY
-            LOCKER INVENTORY
-        =================================== */}
-
-        {isStudent && (
-          <section
-            id="inventory"
-            className="locker-section reveal"
-          >
-
-            <div className="section-heading">
-
-              <div>
-
-                <p className="eyebrow">
-                  LOCKER INVENTORY
-                </p>
-
-                <h2>
-                  Locker Availability
-                </h2>
-
-                <p className="section-description">
-                  Select an available locker
-                  to start your rental.
-                </p>
-
-              </div>
-
-              <button
-                className="refresh-btn"
-                onClick={fetchLockers}
-              >
-                ↻ Refresh
-              </button>
-
-            </div>
-
-            {/* LOADING */}
-
-            {loading ? (
-
-              <div className="empty-state">
-
-                <div className="loader"></div>
-
-                <p>
-                  Loading locker inventory...
-                </p>
-
-              </div>
-
-            ) : lockers.length === 0 ? (
-
-              /* EMPTY */
-
-              <div className="empty-state">
-
-                <div className="empty-icon">
-                  🔐
+                <div>
+                  <p className="eyebrow">LOCKER INVENTORY</p>
+                  <h3>Locker Availability</h3>
                 </div>
 
-                <h3>
-                  No lockers found
-                </h3>
-
-                <p>
-                  Locker inventory is
-                  currently empty.
-                </p>
+                <button
+                  className="refresh-btn"
+                  onClick={handleRefresh}
+                  disabled={loading}
+                >
+                  {loading ? "Loading..." : "Refresh"}
+                </button>
 
               </div>
 
-            ) : (
+              {loading ? (
+                <div className="empty-state">
+                  Loading lockers...
+                </div>
+              ) : lockers.length === 0 ? (
+                <div className="empty-state">
+                  No lockers available.
+                </div>
+              ) : (
+                <div className="locker-grid">
 
-              /* LOCKER GRID */
-
-              <div className="locker-grid">
-
-                {lockers.map(
-                  (locker, index) => (
+                  {lockers.map((locker) => (
 
                     <div
-                      className={`locker-card ${
-                        locker.status.toLowerCase()
-                      } reveal-card`}
-                      style={{
-                        "--delay":
-                          `${index * 80}ms`,
-                      }}
                       key={locker._id}
+                      className={`locker-card ${locker.status.toLowerCase()}`}
                     >
 
-                      <div className="locker-glow"></div>
+                      <div className="locker-number">
+                        {locker.lockerNumber}
+                      </div>
 
-                      {/* TOP */}
+                      <div className="locker-status">
+                        {locker.status}
+                      </div>
 
-                      <div className="locker-top">
-
-                        <div>
-
-                          <span className="locker-label">
-                            LOCKER
-                          </span>
-
-                          <div className="locker-number">
-                            {locker.lockerNumber}
-                          </div>
-
-                        </div>
-
-                        <span
-                          className={`locker-status ${locker.status.toLowerCase()}`}
+                      {locker.status === "Available" && (
+                        <button
+                          className="rent-btn"
+                          onClick={() => setSelectedLocker(locker)}
                         >
+                          Rent Locker
+                        </button>
+                      )}
 
-                          <span></span>
-
-                          {locker.status}
-
+                      {locker.status === "Occupied" && (
+                        <span className="disabled-text">
+                          Currently Rented
                         </span>
+                      )}
 
-                      </div>
-
-                      {/* BODY */}
-
-                      <div className="locker-body">
-
-                        <div className="locker-visual">
-
-                          <div className="locker-shadow"></div>
-
-                          <div className="locker-door">
-
-                            <div className="locker-top-line"></div>
-
-                            <div className="locker-vents">
-
-                              <span></span>
-                              <span></span>
-                              <span></span>
-
-                            </div>
-
-                            <div className="locker-handle"></div>
-
-                            <div className="locker-lock">
-                              ●
-                            </div>
-
-                          </div>
-
-                        </div>
-
-                        <div className="locker-info">
-
-                          <h3>
-                            Storage Locker
-                          </h3>
-
-                          <p>
-
-                            {locker.status ===
-                            "Available"
-                              ? "Ready for booking"
-                              : locker.status ===
-                                "Occupied"
-                              ? "Currently rented"
-                              : "Under maintenance"}
-
-                          </p>
-
-                        </div>
-
-                      </div>
-
-                      {/* STUDENT RENT BUTTON */}
-
-                      <button
-                        className="book-btn"
-                        disabled={
-                          locker.status !==
-                          "Available"
-                        }
-                        onClick={() =>
-                          setSelectedLocker(
-                            locker
-                          )
-                        }
-                      >
-
-                        {locker.status ===
-                        "Available" ? (
-                          <>
-                            Rent Locker
-
-                            <span>
-                              →
-                            </span>
-                          </>
-                        ) : locker.status ===
-                          "Occupied" ? (
-                          "Currently Occupied"
-                        ) : (
-                          "Under Maintenance"
-                        )}
-
-                      </button>
+                      {locker.status === "Maintenance" && (
+                        <span className="disabled-text">
+                          Under Maintenance
+                        </span>
+                      )}
 
                     </div>
-                  )
-                )}
+
+                  ))}
+
+                </div>
+              )}
+            </section>
+
+            {/* ===============================
+                MY RENTAL
+            =============================== */}
+
+            <section
+              id="rental"
+              className="dashboard-card"
+            >
+              <div className="section-header">
+
+                <div>
+                  <p className="eyebrow">RENTAL HISTORY</p>
+                  <h3>My Rental</h3>
+                </div>
 
               </div>
-            )}
 
-          </section>
+              <MyRental />
+            </section>
+          </>
         )}
 
-        {/* ===================================
-            STUDENT ONLY
-            MY RENTAL
-        =================================== */}
-
-        {isStudent && (
-          <section
-            id="rental"
-            className="software-section reveal"
-          >
-
-            <div className="section-divider"></div>
-
-            <MyRental />
-
-          </section>
-        )}
-
-        {/* ===================================
-            ADMIN ONLY
+        {/* ===============================
             ADMIN PANEL
-        =================================== */}
+        =============================== */}
 
         {isAdmin && (
           <section
             id="admin"
-            className="software-section reveal"
+            className="dashboard-card"
           >
-
-            <div className="section-divider"></div>
-
             <AdminPanel
               lockers={lockers}
-              onRefresh={fetchLockers}
+              onRefresh={handleRefresh}
             />
-
           </section>
         )}
 
       </main>
 
-      {/* =====================================
-          FOOTER
-      ===================================== */}
-
-      <footer>
-
-        <div className="footer-brand">
-
-          <div className="footer-dot"></div>
-
-          <strong>
-            Digital Locker
-          </strong>
-
-        </div>
-
-        <span>
-          Secure University Storage
-        </span>
-
-        <span>
-          Node.js • Express.js • MongoDB • React
-        </span>
-
-      </footer>
-
-      {/* =====================================
+      {/* ===============================
           RENTAL MODAL
-          STUDENT ONLY
-      ===================================== */}
+      =============================== */}
 
       {selectedLocker && isStudent && (
-
-        <div
-          className="modal-backdrop"
-          onClick={() =>
-            setSelectedLocker(null)
-          }
-        >
-
-          <div
-            className="modal-wrapper"
-            onClick={(e) =>
-              e.stopPropagation()
-            }
-          >
-
-            <div className="modal-top-line"></div>
-
-            <button
-              className="modal-close"
-              onClick={() =>
-                setSelectedLocker(null)
-              }
-            >
-              ×
-            </button>
-
-            <RentalForm
-              locker={selectedLocker}
-              onClose={() =>
-                setSelectedLocker(null)
-              }
-              onSuccess={
-                handleRentalSuccess
-              }
-            />
-
-          </div>
-
-        </div>
-
+        <RentalForm
+          locker={selectedLocker}
+          onClose={() => setSelectedLocker(null)}
+          onSuccess={() => {
+            setSelectedLocker(null);
+            fetchLockers();
+          }}
+        />
       )}
 
     </div>
