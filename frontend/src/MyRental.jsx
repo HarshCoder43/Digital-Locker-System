@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./MyRental.css";
 
-const API_URL = "http://localhost:5050";
+const API_URL = "https://digital-locker-system-dtwve17qd-rampulse.vercel.app";
 
 function MyRental() {
   const [rentals, setRentals] = useState([]);

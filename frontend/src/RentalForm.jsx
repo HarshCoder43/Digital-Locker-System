@@ -1,7 +1,7 @@
 import { useState } from "react";
 import "./RentalForm.css";
 
-const API_URL = "http://localhost:5050";
+const API_URL = "https://digital-locker-system-dtwve17qd-rampulse.vercel.app";
 
 function RentalForm({ locker, onClose, onSuccess }) {
   const [startDate, setStartDate] = useState("");
