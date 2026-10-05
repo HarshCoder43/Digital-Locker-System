@@ -18,7 +18,7 @@ function Login({ onLogin }) {
 
     try {
       const response = await fetch(
-        "https://digital-locker-system-dtwve17qd-rampulse.vercel.app/api/auth/login",
+        "https://digital-locker-system.vercel.app/api/auth/login",
         {
           method: "POST",
           headers: {

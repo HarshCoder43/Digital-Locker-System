@@ -6,7 +6,7 @@ import RentalForm from "./RentalForm";
 import MyRental from "./MyRental";
 import AdminPanel from "./AdminPanel";
 
-const API_URL = "https://digital-locker-system-dtwve17qd-rampulse.vercel.app";
+const API_URL = "https://digital-locker-system.vercel.app";
 
 /* =========================================
    ANIMATED NUMBER
