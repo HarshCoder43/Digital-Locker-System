@@ -11,83 +11,65 @@ dotenv.config();
 
 const app = express();
 
+// ===============================
+// MIDDLEWARE
+// ===============================
+
 app.use(cors());
+
+app.use((req, res, next) => {
+  // Disable browser/proxy caching for API responses
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  res.setHeader("Surrogate-Control", "no-store");
+
+  next();
+});
+
 app.use(express.json());
 
-// MongoDB connection cache
-let cachedConnection = null;
+// ===============================
+// ROUTES
+// ===============================
 
-const connectDB = async () => {
-  if (mongoose.connection.readyState === 1) {
-    return mongoose.connection;
-  }
-
-  if (cachedConnection) {
-    return cachedConnection;
-  }
-
-  if (!process.env.MONGO_URI) {
-    throw new Error("MONGO_URI environment variable is missing");
-  }
-
-  cachedConnection = mongoose.connect(process.env.MONGO_URI, {
-    serverSelectionTimeoutMS: 10000,
-  });
-
-  try {
-    await cachedConnection;
-
-    console.log("MongoDB Connected Successfully!");
-
-    return mongoose.connection;
-  } catch (error) {
-    cachedConnection = null;
-
-    console.log("MongoDB Connection Failed!");
-    console.log(error.message);
-
-    throw error;
-  }
-};
-
-// Health check
-app.get("/", async (req, res) => {
-  try {
-    await connectDB();
-
-    res.json({
-      message: "Digital Locker Backend is Running!",
-      status: "OK",
-      database: "Connected",
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Digital Locker Backend is Running!",
-      status: "Database Connection Failed",
-      error: error.message,
-    });
-  }
-});
-
-// Connect to MongoDB before API routes
-app.use(async (req, res, next) => {
-  try {
-    await connectDB();
-    next();
-  } catch (error) {
-    res.status(500).json({
-      message: "Database connection failed",
-      error: error.message,
-    });
-  }
-});
-
-// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/lockers", lockerRoutes);
 app.use("/api/rentals", rentalRoutes);
 
-// Local development
+// ===============================
+// HEALTH CHECK
+// ===============================
+
+app.get("/", (req, res) => {
+  res.json({
+    message: "Digital Locker Backend is Running!",
+    status: "OK",
+    database:
+      mongoose.connection.readyState === 1
+        ? "Connected"
+        : "Not Connected",
+  });
+});
+
+// ===============================
+// MONGODB CONNECTION
+// ===============================
+
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => {
+    console.log("MongoDB Connected Successfully!");
+  })
+  .catch((error) => {
+    console.log("MongoDB Connection Failed!");
+    console.log(error.message);
+  });
+
+// ===============================
+// LOCAL DEVELOPMENT
+// ===============================
+
 const PORT = process.env.PORT || 5050;
 
 if (process.env.NODE_ENV !== "production") {
@@ -95,5 +77,9 @@ if (process.env.NODE_ENV !== "production") {
     console.log(`Server running on port ${PORT}`);
   });
 }
+
+// ===============================
+// VERCEL EXPORT
+// ===============================
 
 module.exports = app;

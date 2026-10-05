@@ -1,0 +1,29 @@
+# Query: https://digital-locker-system-dtwve17qd-rampulse.vercel.app
+# ContextLines: 1
+
+5 results - 5 files
+
+frontend/src/AdminPanel.jsx:
+  3  
+  4: const API_URL = "https://digital-locker-system-dtwve17qd-rampulse.vercel.app";
+  5  
+
+frontend/src/App.jsx:
+  8  
+  9: const API_URL = "https://digital-locker-system-dtwve17qd-rampulse.vercel.app";
+  10  
+
+frontend/src/Login.jsx:
+  20        const response = await fetch(
+  21:         "https://digital-locker-system-dtwve17qd-rampulse.vercel.app/api/auth/login",
+  22          {
+
+frontend/src/MyRental.jsx:
+  3  
+  4: const API_URL = "https://digital-locker-system-dtwve17qd-rampulse.vercel.app";
+  5  
+
+frontend/src/RentalForm.jsx:
+  3  
+  4: const API_URL = "https://digital-locker-system-dtwve17qd-rampulse.vercel.app";
+  5  
